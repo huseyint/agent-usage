@@ -1,0 +1,113 @@
+name: Prepare GitHub release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to build, e.g. v0.1.1
+        type: string
+        required: true
+      replace_published:
+        description: Replace the published version with this workflow revision after all builds pass
+        type: boolean
+        default: false
+      artifact_run_id:
+        description: Reuse installers from a completed release run whose three native builds passed
+        type: string
+        default: ""
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    if: github.actor == github.repository_owner
+    runs-on: [self-hosted, linux, x64]
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tag: ${{ steps.source.outputs.tag }}
+      commit: ${{ steps.source.outputs.commit }}
+      previous-tag: ${{ steps.source.outputs.previous-tag }}
+      skip: ${{ steps.source.outputs.skip }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - name: Validate release source and publication credentials
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          REPLACE_PUBLISHED: ${{ inputs.replace_published && 'true' || 'false' }}
+          RELEASE_ARTIFACT_RUN: ${{ inputs.artifact_run_id }}
+          RELEASE_CAN_MOVE_TAG: ${{ (secrets.RELEASE_TAG_SSH_KEY != '' || secrets.RELEASE_TOKEN != '') && 'true' || 'false' }}
+        run: node scripts/release-source.mjs
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.source.outputs.skip != 'true'
+        with:
+          ref: ${{ steps.source.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Match tag, package, Tauri and Cargo versions
+        if: steps.source.outputs.skip != 'true'
+        env:
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          node scripts/release.mjs check-version "$RELEASE_TAG"
+          test -s "docs/releases/${RELEASE_TAG#v}.md"
+  build:
+    needs: validate
+    if: needs.validate.outputs.skip != 'true' && inputs.artifact_run_id == ''
+    uses: ./.github/workflows/desktop.yml
+    with:
+      ref: ${{ needs.validate.outputs.commit }}
+      signing: true
+      package: true
+    secrets: inherit
+  publish:
+    needs: [validate, build]
+    if: >-
+      !cancelled() && needs.validate.result == 'success' && needs.validate.outputs.skip != 'true' &&
+      (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.artifact_run_id != ''))
+    runs-on: [self-hosted, linux, x64]
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: release-assets
+          run-id: ${{ inputs.artifact_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify all supported targets and generate checksums
+        env:
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+        run: node scripts/release.mjs assemble
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
+          RELEASE_PREVIOUS_TAG: ${{ needs.validate.outputs.previous-tag }}
+          RELEASE_REPLACE_PUBLISHED: ${{ inputs.replace_published && 'true' || 'false' }}
+          RELEASE_TAG_SSH_KEY: ${{ secrets.RELEASE_TAG_SSH_KEY }}
+        run: node scripts/draft-release.mjs

@@ -1,0 +1,11 @@
+<svg width="24" height="24" viewBox="195 195 635 635" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cloud" x1="400" y1="210" x2="600" y2="815" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A99AFF"/>
+      <stop offset=".5" stop-color="#6378FF"/>
+      <stop offset="1" stop-color="#3925FF"/>
+    </linearGradient>
+  </defs>
+  <path d="M324 324C344 242 408 204 470 209C514 208 552 225 581 252C648 232 712 261 748 310C776 350 783 398 772 440C810 490 832 544 810 603C790 651 752 685 704 702C684 763 625 815 560 815C506 815 466 791 432 767C368 791 311 760 276 711C249 676 240 629 252 582C221 553 205 516 207 472C206 404 252 344 324 324Z" fill="url(#cloud)"/>
+  <path d="M373 430L419 516L373 600M533 600H649" stroke="white" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

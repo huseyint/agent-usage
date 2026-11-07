@@ -1,0 +1,4 @@
+{"timestamp":"2026-11-01T08:00:00Z","sessionId":"claude-fixture","type":"user","cwd":"/synthetic/workbench","message":{"role":"user","content":"Improve keyboard navigation"}}
+{"type":"custom-title","sessionId":"claude-fixture","customTitle":"Keyboard navigation improvements"}
+{"timestamp":"2026-11-01T10:00:00.000Z","sessionId":"claude-fixture","requestId":"req-0","type":"assistant","costUSD":1.25,"message":{"id":"msg-0","model":"claude-sonnet-4-20250514","usage":{"input_tokens":1000,"output_tokens":200,"cache_read_input_tokens":300,"cache_creation_input_tokens":50}}}
+{"timestamp":"2026-11-02T10:00:00.000Z","sessionId":"claude-fixture","requestId":"req-1","type":"assistant","costUSD":1.25,"message":{"id":"msg-1","model":"claude-sonnet-4-20250514","usage":{"input_tokens":1000,"output_tokens":200,"cache_read_input_tokens":300,"cache_creation_input_tokens":50}}}

@@ -1,0 +1,27 @@
+[
+  {
+    "os": ["self-hosted", "macOS", "ARM64"],
+    "target": "aarch64-apple-darwin",
+    "label": "macOS Apple Silicon",
+    "platform": "macos-arm64",
+    "bundles": "app,dmg"
+  },
+  {
+    "os": ["self-hosted", "windows", "x64"],
+    "target": "x86_64-pc-windows-msvc",
+    "label": "Windows x64",
+    "platform": "windows-x64",
+    "bundles": "nsis"
+  },
+  {
+    "os": ["self-hosted", "linux", "x64"],
+    "container": {
+      "image": "localhost:5000/agent-usage-linux:22.04",
+      "volumes": ["agent-usage-ci-cache-v1:/agent-usage-cache"]
+    },
+    "target": "x86_64-unknown-linux-gnu",
+    "label": "Linux x64",
+    "platform": "linux-x64",
+    "bundles": "deb,rpm,appimage"
+  }
+]

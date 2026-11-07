@@ -1,0 +1,2 @@
+{"type":"session_meta","timestamp":"2026-11-01T09:00:00Z","payload":{"id":"01a0bb8c-c7c0-7630-9d82-860b875930f0","cwd":"/synthetic/workbench"}}
+{"timestamp":"2026-11-01T09:30:00Z","type":"event_msg","payload":{"type":"token_count","info":{"model":"gpt-5","last_token_usage":{"input_tokens":100,"cached_input_tokens":10,"output_tokens":50,"reasoning_output_tokens":0,"total_tokens":150}}}}

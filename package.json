@@ -1,0 +1,59 @@
+{
+  "name": "agent-usage",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=26.13.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "screenshots:readme": "node scripts/capture-readme.mjs",
+    "build": "pnpm typecheck && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "tauri": "tauri",
+    "desktop": "tauri dev",
+    "desktop:build": "tauri build",
+    "check": "pnpm build && cargo fmt --manifest-path src-tauri/Cargo.toml -- --check && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "engine:build": "node scripts/build-engine.mjs",
+    "test": "pnpm test:frontend && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:frontend": "node --test tests/*.test.mjs",
+    "format": "prettier --write src scripts tests/*.mjs",
+    "licenses:generate": "node scripts/sbom.mjs",
+    "github:configure": "node scripts/configure-github.mjs",
+    "release:check": "node scripts/release.mjs check-version",
+    "release:collect": "node scripts/release.mjs collect",
+    "release:assemble": "node scripts/release.mjs assemble"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.104.0",
+    "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-opener": "2.7.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "7.18.4",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@tauri-apps/cli": "2.12.4",
+    "@types/node": "26.6.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "playwright": "1.65.0",
+    "prettier": "3.9.10",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  },
+  "description": "Local-first Claude Code and Codex usage dashboard",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/huseyint/agent-usage.git"
+  },
+  "homepage": "https://github.com/huseyint/agent-usage"
+}

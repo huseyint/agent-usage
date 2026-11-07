@@ -1,0 +1,21 @@
+name: Verify desktop targets
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Also build installers to validate release packaging without publishing
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    if: github.actor == github.repository_owner && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/desktop.yml
+    with:
+      package: ${{ inputs.package || false }}

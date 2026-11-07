@@ -1,0 +1,97 @@
+diff --git a/rust/crates/ccusage-adapter-all/src/loader.rs b/rust/crates/ccusage-adapter-all/src/loader.rs
+index 1fc776e..2515989 100644
+--- a/rust/crates/ccusage-adapter-all/src/loader.rs
++++ b/rust/crates/ccusage-adapter-all/src/loader.rs
+@@ -869,9 +869,27 @@ fn load_claude_rows(
+             .filter_map(|summary| summary.session_id.as_deref())
+             .collect::<BTreeSet<_>>();
+         let sessions = deduped.main_thread_sessions(|session| counted_sessions.contains(session));
++        let mut rows = summary_rows("claude", summaries, false);
++        if std::env::var_os("AGENT_USAGE_SESSION_USAGE").is_some() {
++            let timezone = parse_tz(shared.timezone.as_deref());
++            let mut days = BTreeMap::<(String, String), SessionAccumulator>::new();
++            for entry in &deduped.entries {
++                let date = format_date_tz(entry.timestamp, timezone.as_ref());
++                days.entry((entry.session_id.to_string(), date)).or_default().add_entry(entry);
++            }
++            let mut usage = BTreeMap::<String, Vec<Value>>::new();
++            for ((id, date), group) in days {
++                let mut summary = group.into_summary()?;
++                summary.date = Some(date);
++                for day in summary_rows("claude", vec![summary], false) {
++                    usage.entry(id.clone()).or_default().push(super::report::row_json(&day, false));
++                }
++            }
++            attach_session_usage(&mut rows, &mut usage);
++        }
+         return Ok((
+             AgentRows {
+-                rows: summary_rows("claude", summaries, false),
++                rows,
+                 detected,
+                 warnings: Vec::new(),
+             },
+@@ -948,14 +966,28 @@ fn load_codex_rows(
+         let groups = codex::load_groups(shared, kind)?;
+         let detected = !groups.is_empty();
+         let speed = codex::resolve_codex_speed(requested_speed);
+-        return Ok(AgentRows {
+-            rows: groups
+-                .iter()
+-                .map(|(period, group)| codex_group_row(period, group, pricing, speed, shared.mode))
+-                .collect(),
+-            detected,
+-            warnings: Vec::new(),
+-        });
++        let mut rows: Vec<_> = groups.iter()
++            .map(|(period, group)| codex_group_row(period, group, pricing, speed, shared.mode))
++            .collect();
++        if kind == AgentReportKind::Session && std::env::var_os("AGENT_USAGE_SESSION_USAGE").is_some() {
++            // Load globally deduplicated events before partitioning by owner. Copied
++            // branch history contributes to one session's period usage, just as it
++            // contributes once to the authoritative daily total.
++            let (events, _) = codex::load_codex_events_with_detection(shared)?;
++            let mut sessions = BTreeMap::<String, Vec<codex::CodexTokenUsageEvent>>::new();
++            for event in events {
++                sessions.entry(event.session_id.clone()).or_default().push(event);
++            }
++            let mut usage = BTreeMap::<String, Vec<Value>>::new();
++            for (id, events) in sessions {
++                let days = codex::aggregate_events(&events, AgentReportKind::Daily, shared.timezone.as_deref())?;
++                usage.insert(id, days.iter().map(|(date, group)| {
++                    super::report::row_json(&codex_group_row(date, group, pricing, speed, shared.mode), false)
++                }).collect());
++            }
++            attach_session_usage(&mut rows, &mut usage);
++        }
++        return Ok(AgentRows { rows, detected, warnings: Vec::new() });
+     }
+ 
+     let (mut events, detected) = codex::load_codex_events_with_detection(shared)?;
+@@ -972,6 +1004,13 @@ fn load_codex_rows(
+     })
+ }
+ 
++fn attach_session_usage(rows: &mut [AllRow], usage: &mut BTreeMap<String, Vec<Value>>) {
++    for row in rows {
++        row.metadata.get_or_insert_with(|| json!({}))["dailyUsage"] =
++            json!(usage.remove(&row.period).unwrap_or_default());
++    }
++}
++
+ fn load_priced_summary_agent_rows(
+     agent: &'static str,
+     kind: AgentReportKind,
+diff --git a/rust/crates/ccusage-adapter-all/src/report.rs b/rust/crates/ccusage-adapter-all/src/report.rs
+index 58a7033..a461d6a 100644
+--- a/rust/crates/ccusage-adapter-all/src/report.rs
++++ b/rust/crates/ccusage-adapter-all/src/report.rs
+@@ -130,7 +130,7 @@ impl Serialize for OrderedJsonMap {
+     }
+ }
+ 
+-fn row_json(row: &AllRow, include_agents: bool) -> Value {
++pub(super) fn row_json(row: &AllRow, include_agents: bool) -> Value {
+     let mut value = agent_json(row);
+     if let Some(obj) = value.as_object_mut() {
+         obj.insert("period".to_string(), json!(row.period));

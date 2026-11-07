@@ -1,0 +1,182 @@
+name: Build desktop installers
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Source tag or SHA; empty uses the triggering commit
+        type: string
+        default: ""
+      signing:
+        description: Enable configured release signing credentials
+        type: boolean
+        default: false
+      package:
+        description: Package and upload release installers after verification
+        type: boolean
+        default: false
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  matrix:
+    if: github.actor == github.repository_owner
+    runs-on: [self-hosted, linux, x64]
+    outputs:
+      targets: ${{ steps.targets.outputs.matrix }}
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - name: Prepare Ubuntu 22.04 build environment
+        run: |
+          if ! docker container inspect agent-usage-registry >/dev/null 2>&1; then
+            docker run --detach --restart unless-stopped --publish 127.0.0.1:5000:5000 --volume agent-usage-registry:/var/lib/registry --name agent-usage-registry registry:3
+          fi
+          docker start agent-usage-registry
+          docker build --build-arg RUNNER_UID="$(id -u)" --build-arg RUNNER_GID="$(id -g)" --tag localhost:5000/agent-usage-linux:22.04 --file .github/docker/linux.Dockerfile .github/docker
+          docker push localhost:5000/agent-usage-linux:22.04
+      - id: targets
+        run: node scripts/release.mjs matrix
+      - id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: node scripts/release.mjs check-version
+  desktop:
+    needs: matrix
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.targets) }}
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container || '' }}
+    timeout-minutes: 90
+    env:
+      ENGINE_TARGET: ${{ matrix.target }}
+      RELEASE_COMMIT: ${{ needs.matrix.outputs.commit }}
+      MACOSX_DEPLOYMENT_TARGET: "13.3"
+      CI_CACHE_VOLUME: ${{ matrix.container && '/agent-usage-cache' || '' }}
+    steps:
+      - name: Prepare Git and Bash on Windows
+        if: runner.os == 'Windows' && runner.environment == 'self-hosted'
+        shell: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $ProgressPreference = 'SilentlyContinue'
+          if ((Get-Command git -ErrorAction SilentlyContinue) -and (Get-Command bash -ErrorAction SilentlyContinue)) { exit 0 }
+          $destination = Join-Path $env:RUNNER_TOOL_CACHE 'PortableGit\2.56.0.4\x64'
+          $complete = "$destination.complete"
+          $git = Join-Path $destination 'cmd\git.exe'
+          $bash = Join-Path $destination 'bin\bash.exe'
+          if (-not ((Test-Path $complete) -and (Test-Path $git) -and (Test-Path $bash))) {
+            Write-Output 'Installing Portable Git 2.56.0.4 into the persistent tool cache'
+            $archive = Join-Path $env:RUNNER_TEMP 'PortableGit.exe'
+            Invoke-WebRequest -UseBasicParsing 'https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.4/PortableGit-2.56.0.4-64-bit.7z.exe' -OutFile $archive
+            if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'b1f3e52216e2ed6882d1bebfd4d3fdf319bec40d2edbbf9fd26ec4fd3fce7ed1') { throw 'Portable Git checksum mismatch' }
+            New-Item -ItemType Directory -Path $destination -Force | Out-Null
+            $process = Start-Process -FilePath $archive -ArgumentList '-y', ('-o"{0}"' -f $destination) -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Portable Git extraction failed: $($process.ExitCode)" }
+            if (-not ((Test-Path $git) -and (Test-Path $bash))) { throw 'Portable Git installation is incomplete' }
+            New-Item -ItemType File -Path $complete -Force | Out-Null
+          }
+          Write-Output "Using Git and Bash from $destination"
+          foreach ($directory in @('cmd', 'bin', 'usr\bin')) {
+            Join-Path $destination $directory | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+      - name: Prepare MSVC build tools on Windows
+        if: runner.os == 'Windows' && runner.environment == 'self-hosted'
+        shell: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (Test-Path $vswhere) {
+            $installed = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($installed) { Write-Output "Using MSVC at $installed"; exit 0 }
+          }
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+          if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw 'MSVC build tools are missing. Install Visual Studio Build Tools with Desktop development with C++ as administrator, then retry.'
+          }
+          $installer = Join-Path $env:RUNNER_TEMP 'vs_BuildTools.exe'
+          Invoke-WebRequest -UseBasicParsing 'https://aka.ms/vs/17/release/vs_BuildTools.exe' -OutFile $installer
+          $signature = Get-AuthenticodeSignature $installer
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'Invalid Microsoft Build Tools signature' }
+          $process = Start-Process -FilePath $installer -ArgumentList '--quiet', '--wait', '--norestart', '--nocache', '--add', 'Microsoft.VisualStudio.Workload.VCTools', '--includeRecommended' -Wait -PassThru
+          if ($process.ExitCode -notin @(0, 3010)) { throw "MSVC installation failed: $($process.ExitCode)" }
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.matrix.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+      - name: Prepare persistent runner caches
+        id: cache
+        run: node scripts/runner-cache.mjs
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        if: steps.cache.outputs.pnpm-ready != 'true'
+        with:
+          dest: ${{ steps.cache.outputs.pnpm-dest }}
+      - name: Verify cached pnpm version
+        run: |
+          test "$(pnpm --version)" = "${{ steps.cache.outputs.pnpm-version }}"
+          node scripts/runner-cache.mjs pnpm-ready
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: ${{ matrix.target }}
+          components: rustfmt, clippy
+      - run: pnpm install --frozen-lockfile --prefer-offline --store-dir "$CI_PNPM_STORE"
+      - name: Build exact native ccusage revision
+        run: node scripts/build-engine-cached.mjs
+      - run: pnpm test
+      - name: Verify glib security backport with optimizations
+        if: runner.os == 'Linux'
+        run: cargo test --manifest-path vendor/glib/Cargo.toml --release --lib variant_iter::tests
+      - run: pnpm check
+      - run: pnpm licenses:generate
+        if: inputs.package
+      - name: Prepare signing configuration
+        if: inputs.package
+        id: signing
+        env:
+          APPLE_CERTIFICATE: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_SIGNING_IDENTITY: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_SIGNING_IDENTITY || '' }}
+          APPLE_ID: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+          WINDOWS_CERTIFICATE: ${{ inputs.signing && runner.os == 'Windows' && secrets.WINDOWS_CERTIFICATE || '' }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ inputs.signing && runner.os == 'Windows' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+        run: node scripts/release-signing.mjs
+      - name: Package native engine and notices
+        if: inputs.package
+        env:
+          NO_STRIP: "true"
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+          APPLE_ID: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.signing && runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+        run: |
+          if [[ -z "$APPLE_ID" ]]; then unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; fi
+          node scripts/runner-cache.mjs clean-bundles
+          pnpm tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config .cache/release-signing/tauri.conf.json -- --locked
+      - name: Collect installers, license inventory and engine provenance
+        if: inputs.package
+        run: pnpm release:collect ${{ matrix.target }} --bundle-dir "$CARGO_TARGET_DIR/${{ matrix.target }}/release/bundle"
+      - name: Upload prepared release assets
+        if: inputs.package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 14
+          path: release-assets/${{ matrix.target }}/
+      - name: Remove temporary signing credentials
+        if: always() && (steps.signing.outcome == 'success' || steps.signing.outcome == 'failure')
+        run: node scripts/release-signing.mjs cleanup

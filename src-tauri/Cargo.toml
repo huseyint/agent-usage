@@ -1,0 +1,52 @@
+[package]
+name = "agent-usage"
+version = "0.1.1"
+license = "MIT"
+repository = "https://github.com/huseyint/agent-usage"
+homepage = "https://github.com/huseyint/agent-usage"
+description = "Local-first Claude Code and Codex usage dashboard"
+edition = "2021"
+
+[lib]
+name = "agent_usage_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.4", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.5", features = ["tray-icon"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.38", features = ["bundled"] }
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+walkdir = "2"
+zstd = "0.13"
+notify = "8"
+sha2 = "0.10"
+base64 = "0.22"
+regex = "1"
+roxmltree = "0.21"
+libc = "0.2"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "=2.7.2"
+tauri-plugin-window-state = "2.5.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6.2"
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSResponder", "NSView", "NSWindow", "NSButton", "NSControl", "NSScreen", "NSEvent", "NSStatusItem", "NSStatusBarButton", "block2", "std"] }
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["CFRunLoop", "std"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSGeometry", "NSNotification", "NSString", "NSProcessInfo", "std"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+
+# GTK3 still requires glib 0.18; backport the upstream VariantStrIter fix.
+# Source checksum, patch provenance and removal criteria: ../vendor/README.md.
+[patch.crates-io]
+glib = { path = "../vendor/glib" }
