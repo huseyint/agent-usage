@@ -2,6 +2,8 @@
 
 A desktop dashboard for Claude Code and OpenAI Codex. See your sessions, token usage and estimated costs in one place, with a quick view in your menu bar or system tray.
 
+[Website](https://huseyint.com/agent-usage/) · [Downloads](https://github.com/huseyint/agent-usage/releases)
+
 ![Sessions in light and dark themes](docs/images/sessions.png)
 
 ## Features
@@ -92,6 +94,9 @@ Reports show costs within the selected dates. Session details also include lifet
 ![Menu bar popover with today’s usage and a working session](docs/images/menubar.png)
 
 ## Development
+
+The static project landing page lives in [`website/`](website/README.md), with
+preview and deployment instructions for `huseyint.com/agent-usage/`.
 
 Requires Node 26.13+ LTS (the exact development and CI version is in `.node-version`), pnpm, stable Rust and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
