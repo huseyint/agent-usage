@@ -16,6 +16,7 @@ import {
 import { dateKey } from "./format";
 import { sessionGroupsDescending } from "./session-sort";
 import { sessionPeriodCost, sessionModelPeriodCost } from "./costs";
+import { sessionFirstUsageDate, sessionInPeriod } from "./session-days";
 const zero = (): Tokens => ({
   input: 0,
   output: 0,
@@ -272,7 +273,9 @@ export function demoView(q: Query): ViewData {
     (!q.since || d >= q.since) && (!q.until || d <= q.until);
   const daily = allDaily.filter((d) => provider(d.provider) && inDate(d.date));
   const active = decorated().filter(
-    (s) => provider(s.provider) && s.activityDays.some(inDate),
+    (s) =>
+      provider(s.provider) &&
+      sessionInPeriod(s, q.since, q.until, prefs().timezone),
   );
   const sessions = active
     .filter(
@@ -367,7 +370,7 @@ export function demoView(q: Query): ViewData {
       name: s.title,
       project: s.project,
       provider: s.provider,
-      first: s.firstActivity,
+      first: `${sessionFirstUsageDate(s, prefs().timezone) ?? ""} ${s.firstActivity}`,
       last: s.lastActivity,
     })[q.sort as "last"] ?? s.lastActivity;
   const groupKey = (s: Session) => {

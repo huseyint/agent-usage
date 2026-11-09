@@ -577,7 +577,7 @@ pub fn export_report(
         "sessions" => loop {
             let page = reports::build(snapshot.clone(), &q, &annotations, &aliases, view.stale)?;
             for s in page.sessions {
-                rows.push(serde_json::json!({"id":s.id,"title":s.title,"provider":s.provider,"project":s.project,"firstActivity":s.first_activity,"lastActivity":s.last_activity,"estimatedUsd":s.period_cost_micros.map(|cost| cost as f64/1e6),"totalTokens":s.tokens.total,"inputTokens":s.tokens.input,"outputTokens":s.tokens.output,"cacheReadTokens":s.tokens.cache_read,"cacheCreationTokens":s.tokens.cache_creation,"missingPricing":s.missing_pricing}));
+                rows.push(serde_json::json!({"id":s.id,"title":s.title,"provider":s.provider,"project":s.project,"firstActivity":s.first_activity,"firstUsageDate":metadata::first_usage_date(&s, &view.timezone),"activeDays":metadata::session_activity_days(&s).len(),"lastActivity":s.last_activity,"estimatedUsd":s.period_cost_micros.map(|cost| cost as f64/1e6),"totalTokens":s.tokens.total,"inputTokens":s.tokens.input,"outputTokens":s.tokens.output,"cacheReadTokens":s.tokens.cache_read,"cacheCreationTokens":s.tokens.cache_creation,"missingPricing":s.missing_pricing}));
             }
             q.offset += q.limit;
             if q.offset >= page.session_count {

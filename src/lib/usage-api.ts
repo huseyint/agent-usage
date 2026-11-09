@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { isDesktop } from "./desktop";
+import { sessionActivityDays, sessionFirstUsageDate } from "./session-days";
 import {
   demoAlias,
   demoAnnotate,
@@ -113,6 +114,10 @@ export const usageApi = {
             title: s.title,
             provider: s.provider,
             project: s.project,
+            firstActivity: s.firstActivity,
+            firstUsageDate: sessionFirstUsageDate(s, v.timezone),
+            activeDays: sessionActivityDays(s).length,
+            lastActivity: s.lastActivity,
             estimatedUsd:
               s.periodCostMicros == null ? null : s.periodCostMicros / 1e6,
             totalTokens: s.tokens.total,

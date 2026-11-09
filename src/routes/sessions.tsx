@@ -19,17 +19,18 @@ import {
 } from "@/components/usage-components";
 import { ProviderMark, UIcon } from "@/components/usage-icon";
 import { NewSessionBadge } from "@/components/new-session-badge";
+import { SessionCostInfo } from "@/components/session-cost-info";
 import { PeriodCost } from "@/components/period-cost";
 import {
   periodCostDescription,
   lifetimeCostDescription,
-  unavailablePeriodDescription,
   sessionPeriodCost,
   sessionModelPeriodCost,
 } from "@/lib/costs";
 import { PopupMenu } from "@/components/popup-menu";
 import { FilterMultiSelect } from "@/components/filter-multi-select";
 import { ProjectLabel } from "@/components/project-icon";
+import { sessionActivityDays, sessionFirstUsageDate } from "@/lib/session-days";
 import type { Annotation, Query, Session } from "@/lib/usage-types";
 import {
   sessionColumnSort,
@@ -596,9 +597,11 @@ export function Sessions() {
                       </small>
                     </th>
                     <th className="numeric" title={periodCostDescription}>
-                      {v?.groupPeriodTotals[key] == null
-                        ? "—"
-                        : money(v.groupPeriodTotals[key]!)}
+                      <span className="session-cost">
+                        {v?.groupPeriodTotals[key] == null
+                          ? "—"
+                          : money(v.groupPeriodTotals[key]!)}
+                      </span>
                     </th>
                     <th className="session-columns-cell" aria-hidden="true" />
                   </tr>
@@ -708,18 +711,14 @@ export function Sessions() {
                           {compact(s.tokens.total)}
                         </td>
                       )}
-                      <td
-                        className="numeric strong"
-                        title={
-                          s.periodCostMicros == null
-                            ? unavailablePeriodDescription
-                            : periodCostDescription
-                        }
-                      >
-                        {s.periodCostMicros == null
-                          ? "—"
-                          : money(s.periodCostMicros)}
-                        {s.missingPricing && " +"}
+                      <td className="numeric strong">
+                        <span className="session-cost">
+                          <PeriodCost
+                            value={s.periodCostMicros}
+                            partial={s.missingPricing}
+                          />
+                          <SessionCostInfo session={s} />
+                        </span>
                       </td>
                       <td className="session-columns-cell" aria-hidden="true" />
                     </tr>
@@ -874,6 +873,8 @@ export function SessionDrawer({
           60000,
       )
     : null;
+  const firstUsageDate = sessionFirstUsageDate(s, u.prefs.timezone);
+  const activeDays = sessionActivityDays(s).length;
   return (
     <dialog
       ref={dialog}
@@ -1006,7 +1007,12 @@ export function SessionDrawer({
               <dd>
                 {s.firstActivity
                   ? `${displayDate(dateKey(new Date(s.firstActivity), u.prefs.timezone))} · ${time(s.firstActivity, u.prefs.timezone)}`
-                  : "Unavailable"}
+                  : firstUsageDate
+                    ? displayDate(firstUsageDate)
+                    : "Unavailable"}
+                {!s.firstActivity && firstUsageDate && (
+                  <small>Exact time unavailable</small>
+                )}
               </dd>
             </div>
             <div>
@@ -1028,6 +1034,10 @@ export function SessionDrawer({
                     : `${(span / 60).toFixed(1)} hours`}
                 <small>Not billable time</small>
               </dd>
+            </div>
+            <div>
+              <dt>Active days</dt>
+              <dd>{activeDays || "Unavailable"}</dd>
             </div>
             <div>
               <dt>Source verification</dt>

@@ -3334,6 +3334,29 @@ small {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.session-cost {
+  position: relative;
+  display: block;
+  padding-right: 20px;
+  text-align: right;
+}
+.session-cost-info {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 16px;
+  color: var(--muted);
+  cursor: default;
+}
+.session-cost-info:hover,
+.session-cost-info:focus-visible {
+  color: var(--secondary);
+}
 .session-name-cell {
   min-width: 190px;
   max-width: 330px;

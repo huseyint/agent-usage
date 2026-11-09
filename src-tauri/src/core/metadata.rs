@@ -71,6 +71,28 @@ pub fn local_day(timestamp: &str, tz: &str) -> Option<String> {
             .to_string()
     })
 }
+pub fn session_activity_days(session: &Session) -> BTreeSet<&str> {
+    session
+        .activity_days
+        .iter()
+        .map(String::as_str)
+        .chain(
+            session
+                .daily_usage
+                .iter()
+                .flatten()
+                .map(|day| day.date.as_str()),
+        )
+        .collect()
+}
+pub fn first_usage_date(session: &Session, tz: &str) -> Option<String> {
+    session_activity_days(session)
+        .first()
+        .map(|day| (*day).to_owned())
+        .into_iter()
+        .chain(local_day(&session.first_activity, tz))
+        .min()
+}
 pub fn normalize_roots(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     let mut paths: Vec<_> = paths
         .into_iter()
@@ -600,7 +622,7 @@ pub fn enrich(sessions: &mut [Session], sources: &mut [Source], p: &Preferences)
         }
     }
     if sources.iter().any(|s| s.warning.is_some()) {
-        warnings.push("Session metadata is incomplete for some logs. Usage totals come from ccusage; affected session date filters use last activity, and some titles may use identifier fallbacks.".into());
+        warnings.push("Session metadata is incomplete for some logs. Usage totals and available usage dates come from ccusage. Exact start times may be unavailable, and some titles may use identifier fallbacks. Date filters use last activity only when no usage dates are available.".into());
     }
     Enrichment {
         warnings,

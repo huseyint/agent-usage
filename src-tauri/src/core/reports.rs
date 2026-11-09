@@ -1,4 +1,7 @@
-use super::{metadata::local_day, types::*};
+use super::{
+    metadata::{first_usage_date, local_day, session_activity_days},
+    types::*,
+};
 use chrono::{Datelike, Duration, NaiveDate};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -28,14 +31,9 @@ fn in_period(s: &Session, q: &Query, tz: &str) -> bool {
     if !provider_matches(&s.provider, q) {
         return false;
     }
-    if s.daily_usage
-        .as_ref()
-        .is_some_and(|days| days.iter().any(|d| day_matches(&d.date, q)))
-    {
-        return true;
-    }
-    if !s.activity_days.is_empty() {
-        s.activity_days.iter().any(|d| day_matches(d, q))
+    let days = session_activity_days(s);
+    if !days.is_empty() {
+        days.iter().any(|d| day_matches(d, q))
     } else {
         local_day(&s.last_activity, tz).is_some_and(|d| day_matches(&d, q))
     }
@@ -337,7 +335,9 @@ pub fn build(
             "name" => a.title.to_lowercase().cmp(&b.title.to_lowercase()),
             "project" => a.project.cmp(&b.project),
             "provider" => a.provider.cmp(&b.provider),
-            "first" => a.first_activity.cmp(&b.first_activity),
+            "first" => first_usage_date(a, &snapshot.timezone)
+                .cmp(&first_usage_date(b, &snapshot.timezone))
+                .then_with(|| a.first_activity.cmp(&b.first_activity)),
             _ => a.last_activity.cmp(&b.last_activity),
         }
         .then_with(|| a.key.cmp(&b.key));
@@ -394,6 +394,99 @@ pub fn csv_cell(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn incomplete_metadata_uses_daily_dates_for_filters_totals_and_first_sort() {
+        let day = |date: &str, cost| DailyUsage {
+            date: date.into(),
+            provider: "codex".into(),
+            cost_micros: cost,
+            ..Default::default()
+        };
+        let spanning = Session {
+            key: "spanning".into(),
+            provider: "codex".into(),
+            project_path: "project".into(),
+            last_activity: "2026-11-10T18:00:00Z".into(),
+            source_status: "metadata incomplete".into(),
+            daily_usage: Some(vec![
+                day("2026-11-09", 75_000),
+                day("2026-11-08", 1_500_000),
+            ]),
+            cost_micros: 1_575_000,
+            ..Default::default()
+        };
+        assert_eq!(
+            first_usage_date(&spanning, "America/Chicago").as_deref(),
+            Some("2026-11-08")
+        );
+        assert_eq!(session_activity_days(&spanning).len(), 2);
+        let snapshot = Snapshot {
+            timezone: "America/Chicago".into(),
+            sessions: vec![spanning.clone()],
+            daily: spanning.daily_usage.clone().unwrap(),
+            ..Default::default()
+        };
+        for (date, cost, count) in [
+            ("2026-11-08", 1_500_000, 1),
+            ("2026-11-09", 75_000, 1),
+            ("2026-11-10", 0, 0),
+        ] {
+            let view = build(
+                snapshot.clone(),
+                &Query {
+                    since: Some(date.into()),
+                    until: Some(date.into()),
+                    ..Default::default()
+                },
+                &Default::default(),
+                &Default::default(),
+                false,
+            )
+            .unwrap();
+            assert_eq!(view.session_count, count);
+            assert_eq!(view.summary.sessions, count);
+            assert_eq!(view.summary.cost_micros, cost);
+            assert_eq!(view.projects.len(), count);
+            if count > 0 {
+                assert_eq!(view.sessions[0].period_cost_micros, Some(cost));
+                assert_eq!(view.projects[0].period_cost_micros, Some(cost));
+                assert_eq!(view.provider_lifetime_costs["codex"], 1_575_000);
+            }
+        }
+        let view = build(
+            Snapshot {
+                sessions: vec![
+                    Session {
+                        key: "earlier".into(),
+                        provider: "codex".into(),
+                        first_activity: "2026-11-07T18:00:00Z".into(),
+                        last_activity: "2026-11-07T19:00:00Z".into(),
+                        activity_days: vec!["2026-11-07".into()],
+                        ..Default::default()
+                    },
+                    spanning,
+                ],
+                ..snapshot
+            },
+            &Query {
+                sort: "first".into(),
+                group_by: "none".into(),
+                descending: false,
+                ..Default::default()
+            },
+            &Default::default(),
+            &Default::default(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            view.sessions
+                .iter()
+                .map(|s| s.key.as_str())
+                .collect::<Vec<_>>(),
+            vec!["earlier", "spanning"]
+        );
+    }
     #[test]
     fn period_costs_preserve_lifetime_and_full_group_totals_before_pagination() {
         let day = |date: &str, cost| DailyUsage {
