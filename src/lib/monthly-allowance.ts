@@ -35,3 +35,35 @@ export function monthlyProviderSpend(daily: DailyUsage[], provider: Provider) {
 export function validMonthlyAllowance(value: number | null | undefined) {
   return value == null || (Number.isFinite(value) && value > 0);
 }
+
+export function monthlyAllowancePace(
+  today: string,
+  spend: number,
+  allowance: number,
+) {
+  const [year, month, day] = today.split("-").map(Number);
+  // Match the month-to-date query: include today in the display timezone.
+  const monthFraction = day / new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const usedFraction = spend / allowance;
+  // Avoid switching states for tiny differences around the calendar marker.
+  const difference = usedFraction - monthFraction;
+  const state =
+    usedFraction >= 1
+      ? "exhausted"
+      : Math.abs(difference) <= 0.02 + Number.EPSILON
+        ? "on-pace"
+        : difference > 0
+          ? "above-pace"
+          : "below-pace";
+  const label =
+    state === "exhausted"
+      ? usedFraction > 1
+        ? "Over allowance"
+        : "Allowance reached"
+      : state === "on-pace"
+        ? "On pace"
+        : state === "above-pace"
+          ? "Above pace"
+          : "Below pace";
+  return { monthFraction, state, label };
+}

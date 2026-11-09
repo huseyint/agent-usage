@@ -1,8 +1,11 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type CSSProperties } from "react";
 import { NavLink } from "react-router";
 import { useUsage } from "@/lib/usage-context";
 import { costDescription, money } from "@/lib/format";
-import { monthlyProviderSpend } from "@/lib/monthly-allowance";
+import {
+  monthlyAllowancePace,
+  monthlyProviderSpend,
+} from "@/lib/monthly-allowance";
 import type { Provider } from "@/lib/usage-types";
 import { ProviderMark } from "./usage-icon";
 
@@ -15,7 +18,7 @@ export function SourceNavItem({
   ready: boolean;
   allowance: number | null;
 }) {
-  const { monthlyUsage, bootstrap } = useUsage();
+  const { monthlyUsage, bootstrap, today } = useUsage();
   const [open, setOpen] = useState(false);
   const tooltipId = useId();
   const label = provider === "claude" ? "Claude Code" : "Codex";
@@ -30,6 +33,16 @@ export function SourceNavItem({
     ? `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format((spend / allowance) * 100)}%`
     : "";
   const cached = monthlyUsage.data?.stale || monthlyUsage.isError;
+  const pace = hasAllowance
+    ? monthlyAllowancePace(today, spend, allowance)
+    : null;
+  const monthPercentage = pace
+    ? new Intl.NumberFormat("en-US", {
+        style: "percent",
+        maximumFractionDigits: 0,
+      }).format(pace.monthFraction)
+    : "";
+  const paceLabel = missingPricing ? "Pace unavailable" : pace?.label;
   const status = monthlyUsage.isError
     ? "Monthly spend unavailable"
     : bootstrap.data?.hasSnapshot
@@ -66,17 +79,33 @@ export function SourceNavItem({
         <span className="source-nav-name">{label}</span>
         <span className={`status-dot ${ready ? "ok" : ""}`} />
         {hasAllowance && (
-          <progress
-            className="source-allowance"
-            max={allowance}
-            value={Math.min(spend, allowance)}
-            aria-label={`${label} monthly allowance`}
-            aria-valuetext={
-              available
-                ? `${money(costMicros)} spent of ${money(allowance * 1e6)} USD (${percentage} used)${missingPricing ? "; incomplete pricing" : ""}${cached ? "; cached snapshot" : ""}`
-                : status
+          <span
+            className="source-allowance-track"
+            data-pace={
+              available ? (missingPricing ? "unknown" : pace?.state) : "unknown"
             }
-          />
+            data-unavailable={!available || undefined}
+            style={
+              {
+                "--month-progress": `${pace!.monthFraction * 100}%`,
+              } as CSSProperties
+            }
+          >
+            <progress
+              className="source-allowance"
+              max={allowance}
+              value={Math.min(spend, allowance)}
+              aria-label={`${label} monthly allowance`}
+              aria-valuetext={
+                available
+                  ? `${money(costMicros)} spent of ${money(allowance * 1e6)} USD (${percentage} used); ${monthPercentage} through the month; ${paceLabel}${missingPricing ? "; incomplete pricing" : ""}${cached ? "; cached snapshot" : ""}`
+                  : status
+              }
+            />
+            {available && (
+              <span className="source-allowance-marker" aria-hidden="true" />
+            )}
+          </span>
         )}
       </NavLink>
       {open && (
@@ -106,12 +135,23 @@ export function SourceNavItem({
                       <dd>{percentage}</dd>
                     </div>
                     <div>
+                      <dt>Month elapsed</dt>
+                      <dd>{monthPercentage}</dd>
+                    </div>
+                    <div>
+                      <dt>Pace</dt>
+                      <dd>{paceLabel}</dd>
+                    </div>
+                    <div>
                       <dt>
                         {spend > allowance ? "Over allowance" : "Remaining"}
                       </dt>
                       <dd>{money(Math.abs(allowance * 1e6 - costMicros))}</dd>
                     </div>
                   </dl>
+                  <p className="source-tooltip-note">
+                    The tick marks today’s share of the month.
+                  </p>
                   {missingPricing && (
                     <p className="source-tooltip-notice">
                       Some usage has no pricing. Spend is incomplete.

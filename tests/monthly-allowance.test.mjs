@@ -3,9 +3,62 @@ import assert from "node:assert/strict";
 import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import {
   monthlyAllowanceOptions,
+  monthlyAllowancePace,
   monthlyProviderSpend,
   validMonthlyAllowance,
 } from "../src/lib/monthly-allowance.ts";
+
+test("pace compares allowance used with the current calendar day", () => {
+  assert.deepEqual(monthlyAllowancePace("2026-11-15", 30, 100), {
+    monthFraction: 0.5,
+    state: "below-pace",
+    label: "Below pace",
+  });
+  assert.equal(monthlyAllowancePace("2026-11-15", 50, 100).state, "on-pace");
+  assert.equal(monthlyAllowancePace("2026-11-15", 75, 100).state, "above-pace");
+  assert.equal(monthlyAllowancePace("2026-11-15", 0, 100).state, "below-pace");
+  for (const spend of [48, 52])
+    assert.equal(
+      monthlyAllowancePace("2026-11-15", spend, 100).state,
+      "on-pace",
+    );
+  assert.equal(
+    monthlyAllowancePace("2026-11-15", 47.9, 100).state,
+    "below-pace",
+  );
+  assert.equal(
+    monthlyAllowancePace("2026-11-15", 52.1, 100).state,
+    "above-pace",
+  );
+});
+
+test("pace includes today and handles different month lengths and leap years", () => {
+  for (const [date, days] of [
+    ["2026-02-14", 28],
+    ["2028-02-14", 29],
+    ["2026-11-14", 30],
+    ["2026-12-14", 31],
+  ]) {
+    assert.equal(monthlyAllowancePace(date, 0, 100).monthFraction, 14 / days);
+  }
+  assert.equal(monthlyAllowancePace("2026-12-31", 50, 100).monthFraction, 1);
+  assert.equal(
+    monthlyAllowancePace("2027-01-01", 0, 100).monthFraction,
+    1 / 31,
+  );
+});
+
+test("reaching the allowance takes precedence over pace, including month end", () => {
+  for (const today of ["2026-11-01", "2026-11-15", "2026-11-30"]) {
+    assert.equal(monthlyAllowancePace(today, 100, 100).state, "exhausted");
+    assert.equal(
+      monthlyAllowancePace(today, 100, 100).label,
+      "Allowance reached",
+    );
+    assert.equal(monthlyAllowancePace(today, 125, 100).state, "exhausted");
+    assert.equal(monthlyAllowancePace(today, 125, 100).label, "Over allowance");
+  }
+});
 
 test("month-to-date totals query all providers without report filters", async () => {
   let query;

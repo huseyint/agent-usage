@@ -171,6 +171,7 @@ function useUsageState() {
     isNewSession,
     sessionActivity,
     prefs,
+    today,
     monthlyUsage,
     view,
     sessionsView,

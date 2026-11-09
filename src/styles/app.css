@@ -1544,9 +1544,34 @@ small {
   grid-column: 3;
   grid-row: 1 / -1;
 }
-.source-allowance {
+.source-allowance-track {
   grid-column: 2;
   grid-row: 2;
+  position: relative;
+  height: 4px;
+  --allowance-color: var(--accent);
+  --allowance-track-color: color-mix(
+    in srgb,
+    var(--secondary) 18%,
+    var(--sidebar)
+  );
+}
+.source-allowance-track[data-pace="above-pace"] {
+  --allowance-color: #a96800;
+}
+.source-allowance-track[data-pace="exhausted"] {
+  --allowance-color: #cf3838;
+}
+.source-allowance-track[data-pace="unknown"] {
+  --allowance-color: var(--muted);
+}
+[data-theme="dark"] .source-allowance-track[data-pace="above-pace"] {
+  --allowance-color: #e5ad50;
+}
+[data-theme="dark"] .source-allowance-track[data-pace="exhausted"] {
+  --allowance-color: #f07878;
+}
+.source-allowance {
   display: block;
   appearance: none;
   width: 100%;
@@ -1555,19 +1580,34 @@ small {
   border: 0;
   border-radius: 4px;
   overflow: hidden;
-  background: var(--fill);
-  color: var(--accent);
+  background: var(--allowance-track-color);
+  color: var(--allowance-color);
 }
 .source-allowance::-webkit-progress-bar {
-  background: var(--fill);
+  background: var(--allowance-track-color);
 }
 .source-allowance::-webkit-progress-value {
-  background: var(--accent);
+  background: var(--allowance-color);
   border-radius: 4px;
 }
 .source-allowance::-moz-progress-bar {
-  background: var(--accent);
+  background: var(--allowance-color);
   border-radius: 4px;
+}
+.source-allowance-marker {
+  position: absolute;
+  left: clamp(1px, var(--month-progress), calc(100% - 1px));
+  top: -2px;
+  width: 2px;
+  height: 8px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: var(--secondary);
+  box-shadow: 0 0 0 1px var(--sidebar);
+  pointer-events: none;
+}
+.source-allowance-track[data-unavailable] .source-allowance {
+  opacity: 0.5;
 }
 .status-dot {
   width: 5px;
