@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useUsage } from "@/lib/usage-context";
 import { usageApi } from "@/lib/usage-api";
-import { isDesktop, isMac, isWindows } from "@/lib/desktop";
+import { isDesktop, isMac } from "@/lib/desktop";
 import { usePreferences } from "@/lib/preferences";
 import { time } from "@/lib/format";
 import { UIcon, ProviderMark, type UsageIconName } from "./usage-icon";
@@ -119,7 +119,7 @@ export function AppShell() {
             className={scanning ? "spinning" : ""}
           />
         </button>
-        {isDesktop && isWindows && <WindowControls />}
+        {isDesktop && !isMac && <WindowControls />}
       </header>
       <div className="application-body">
         <aside

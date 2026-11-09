@@ -4,7 +4,7 @@ mod ipc;
 mod outside_click;
 mod tray;
 mod tray_icon;
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
 
@@ -25,7 +25,7 @@ pub fn run() {
                 )
                 .build(),
         );
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     let builder = builder.menu(|app| {
         let menu = Menu::default(app)?;
         let settings = MenuItem::with_id(app, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?;
@@ -150,7 +150,7 @@ pub fn run() {
             // register AppState before loading either frontend.
             for config in &app.config().app.windows {
                 let window = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
-                #[cfg(target_os = "windows")]
+                #[cfg(any(target_os = "windows", target_os = "linux"))]
                 let window = if config.label == "main" {
                     window.decorations(false).shadow(true)
                 } else {

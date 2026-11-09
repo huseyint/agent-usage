@@ -1,9 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "windows-controls",
-  "description": "Window controls in the Windows dashboard header.",
+  "identifier": "window-controls",
+  "description": "Window controls in the Windows and Linux dashboard header.",
   "windows": ["main"],
-  "platforms": ["windows"],
+  "platforms": ["windows", "linux"],
   "permissions": [
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",

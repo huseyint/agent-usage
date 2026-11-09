@@ -4,7 +4,6 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 
 export const isDesktop = isTauri();
 export const isMac = navigator.platform.startsWith("Mac");
-export const isWindows = navigator.platform.startsWith("Win");
 export const repositoryUrl = "https://github.com/huseyint/agent-usage";
 export const ccusageUrl = "https://github.com/ccusage/ccusage";
 

@@ -10,7 +10,7 @@ import {
 } from "react-router";
 import { WhatsNewDialog } from "./components/whats-new-dialog";
 import { AppShell } from "./components/app-shell";
-import { isDesktop, isWindows, listenForMenu } from "./lib/desktop";
+import { isDesktop, isMac, listenForMenu } from "./lib/desktop";
 import { applyTheme, usePreferences } from "./lib/preferences";
 import { UsageProvider, useUsage } from "./lib/usage-context";
 import { Overview, Projects, Models } from "./routes/analytics";
@@ -69,7 +69,7 @@ function Application() {
           50,
         );
       }
-      if (!isDesktop || isWindows) {
+      if (!isDesktop || !isMac) {
         const name = (
           { ",": "settings", "\\": "toggle-sidebar" } as Record<string, string>
         )[e.key.toLowerCase()];
