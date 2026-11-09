@@ -152,7 +152,7 @@ test("recovery rejects missing, duplicate and expired target artifacts", () => {
 
 test("new releases accept a missing release but propagate authentication failures", () => {
   const { options } = fixture();
-  for (const status of [404, 403]) {
+  for (const status of [404, "404", 403, "403", 500, "500"]) {
     const gh = (args) => {
       if (args[1].includes("releases/tags")) {
         const error = Error("API failed");
@@ -162,7 +162,8 @@ test("new releases accept a missing release but propagate authentication failure
       return options.gh(args);
     };
     const run = () => planRelease({ ...options, replacePublished: false, gh });
-    if (status === 404) assert.equal(run().commit, options.workflowCommit);
+    if (status === 404 || status === "404")
+      assert.equal(run().commit, options.workflowCommit);
     else assert.throws(run, /API failed/);
   }
 });

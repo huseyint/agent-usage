@@ -28,7 +28,7 @@ export function planRelease({
     try {
       status = JSON.parse(error.stdout?.toString()).status;
     } catch {}
-    if (status !== 404) throw error;
+    if (Number(status) !== 404) throw error;
   }
   // A deploy-key tag update triggers a push run. Its release is already published.
   if (event === "push" && release && !release.draft) return { skip: "true" };
