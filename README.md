@@ -27,6 +27,29 @@ Download installers from [Releases](https://github.com/huseyint/agent-usage/rele
 
 Signing, notarization and clean-machine validation are still pending. See the [release guide](docs/RELEASING.md) for build and signing details.
 
+### macOS first launch
+
+The macOS build is not notarized. Download it from this repository's [Releases](https://github.com/huseyint/agent-usage/releases), then copy **AI Coding Usage.app** to **Applications**. If macOS blocks the app because the developer cannot be verified, use either method below.
+
+**System Settings**
+
+1. Try opening **AI Coding Usage** in Applications, then dismiss the warning.
+2. Go to **Apple menu → System Settings → Privacy & Security** and scroll to **Security**.
+3. Find the message about AI Coding Usage and click **Open Anyway**. Authenticate if prompted, then click **Open** in the confirmation dialog.
+
+If **Open Anyway** is missing, try opening the app again and return to this settings page. See [Apple's instructions](https://support.apple.com/en-us/102445).
+
+**Terminal**
+
+Open Terminal and run:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/AI Coding Usage.app"
+open "/Applications/AI Coding Usage.app"
+```
+
+This removes the download quarantine attribute from this app bundle. Replace the path if you installed the app elsewhere.
+
 ## Use
 
 1. Open the app and connect Claude Code, Codex, or both. Standard local folders are detected automatically; add custom folders in **Settings → Sources**.

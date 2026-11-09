@@ -78,6 +78,8 @@ Recovery accepts only completed runs of this repository's release workflow, with
 
 Without secrets, macOS packages use ad-hoc signatures and are **not notarized**; Windows packages are unsigned. The generated release notes and manifests state the signing mode. These artifacts are useful for testing but will encounter OS trust checks. Configuring only part of a signing credential set fails the build instead of silently producing unsigned packages.
 
+For an unnotarized macOS build, include the [first-launch instructions](../README.md#macos-first-launch) in the release notes. They cover both the System Settings exception and the app-specific Terminal command.
+
 For Developer ID signing and Apple notarization, add these GitHub Actions repository secrets:
 
 | Secret | Value |
