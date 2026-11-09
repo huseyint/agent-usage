@@ -50,6 +50,30 @@ open "/Applications/AI Coding Usage.app"
 
 This removes the download quarantine attribute from this app bundle. Replace the path if you installed the app elsewhere.
 
+### Windows installer warning
+
+The Windows installer is unsigned, so Microsoft Defender SmartScreen may show **Windows protected your PC** or an unrecognized-app warning. Download the installer from this repository's [Releases](https://github.com/huseyint/agent-usage/releases).
+
+**SmartScreen dialog**
+
+1. Open the downloaded `AI-Coding-Usage_1.0.0_windows-x64-setup.exe`.
+2. On the SmartScreen warning, click **More info**, then **Run anyway**.
+3. Complete the installer, then open **AI Coding Usage** from the Start menu.
+
+**PowerShell**
+
+To remove the download block from this installer file before opening it, run:
+
+```powershell
+$installer = Join-Path $HOME "Downloads\AI-Coding-Usage_1.0.0_windows-x64-setup.exe"
+Unblock-File -LiteralPath $installer
+Start-Process -FilePath $installer
+```
+
+Adjust the filename and location for your download. `Unblock-File` removes this file's downloaded-from-the-internet marker; it does not sign the installer. If **Run anyway** is unavailable, Smart App Control or an organization policy may block unsigned apps. On a managed PC, contact your administrator.
+
+See Microsoft's [SmartScreen guidance](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation) and [Unblock-File documentation](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/unblock-file).
+
 ## Use
 
 1. Open the app and connect Claude Code, Codex, or both. Standard local folders are detected automatically; add custom folders in **Settings → Sources**.

@@ -80,6 +80,8 @@ Without secrets, macOS packages use ad-hoc signatures and are **not notarized**;
 
 For an unnotarized macOS build, include the [first-launch instructions](../README.md#macos-first-launch) in the release notes. They cover both the System Settings exception and the app-specific Terminal command.
 
+For an unsigned Windows build, include the [installer warning instructions](../README.md#windows-installer-warning). They cover SmartScreen's **More info → Run anyway** option, the file-specific PowerShell command, and policy restrictions that can prevent an override.
+
 For Developer ID signing and Apple notarization, add these GitHub Actions repository secrets:
 
 | Secret | Value |
