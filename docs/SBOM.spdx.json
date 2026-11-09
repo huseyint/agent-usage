@@ -3,9 +3,9 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "AI Coding Usage dependency inventory",
-  "documentNamespace": "https://spdx.org/spdxdocs/agent-usage-584e5674fdb28e5041ea7530b8e688b501b9b5f7ec13c99e52a508471deee567",
+  "documentNamespace": "https://spdx.org/spdxdocs/agent-usage-58153ec78ce632805c263223a5d16afb574825e48110c38ddd6e4196b1368674",
   "creationInfo": {
-    "created": "2026-11-09T03:52:49.999Z",
+    "created": "2026-11-09T03:59:13.937Z",
     "creators": [
       "Tool: agent-usage-sbom-0.1"
     ]
@@ -298,9 +298,9 @@
       "comment": "Dependency inventory: ccusage-rust"
     },
     {
-      "SPDXID": "SPDXRef-b40cb768d6ba514ea36146eb",
+      "SPDXID": "SPDXRef-bacb37b45e1ac779b5cfff48",
       "name": "agent-usage",
-      "versionInfo": "0.1.1",
+      "versionInfo": "1.0.0",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",

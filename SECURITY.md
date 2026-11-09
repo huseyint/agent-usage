@@ -10,6 +10,6 @@ Report security concerns through [GitHub's private vulnerability reporting form]
 
 Verification runs on the maintainer's self-hosted runners only for the repository owner's pushes to `main` and manual runs on `main`. Pull requests do not trigger these runners. Release builds run only from maintainer-controlled tags or manual release dispatches.
 
-Only the current 0.1 development line is supported. Review platform installers/signatures before public release. Distributed builds in this workspace are unsigned development builds; signing/notarization is not claimed.
+Only the current 1.0 release line is supported. Review platform installers/signatures before public release. Distributed builds in this workspace are unsigned development builds; signing/notarization is not claimed.
 
 The Linux GTK3 dependency includes a local backport of the upstream fix for RUSTSEC-2024-0429. See [the source and patch provenance](vendor/README.md). The upstream crate version is preserved, so version-based scanners may still flag it. This backport does not resolve the separate maintenance advisories in the GTK3/D-Bus dependency tree.

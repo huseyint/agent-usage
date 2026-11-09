@@ -46,8 +46,8 @@ gh workflow run check.yml --ref main -f package=true
 4. Commit the source and create/push its version tag:
 
    ```sh
-   git tag -a v0.1.1 -m 'AI Coding Usage 0.1.1'
-   git push origin v0.1.1
+   git tag -a v1.0.0 -m 'AI Coding Usage 1.0.0'
+   git push origin v1.0.0
    ```
 
 Pushing `v*` starts **Prepare GitHub release**. The workflow rejects tags that disagree with any version manifest or do not resolve to the checked-out commit. Alternatively, run that workflow manually with an existing version tag. A manual run uses the selected workflow revision to build the supplied tag, so use a revision containing the same release setup as the tag.
@@ -59,7 +59,7 @@ A failed platform prevents release uploads. Failed uploads can be retried: exist
 To explicitly replace a published version, back up its current assets and notes, then manually run `release.yml` on the source branch with the existing `tag` and `replace_published=true`. The source version must still match the tag. The workflow builds the selected workflow revision, verifies all supported targets and checksums, replaces the published downloads, and moves the tag to that exact source commit. It keeps the release published and rejects a tag changed during the build. For example:
 
 ```sh
-gh workflow run release.yml --ref main -f tag=v0.1.1 -f replace_published=true
+gh workflow run release.yml --ref main -f tag=v1.0.0 -f replace_published=true
 ```
 
 Moving an existing tag across workflow changes can be rejected with `Resource not accessible by integration` when using the built-in token. Tag updates use a dedicated write deploy key for this repository, stored in the `RELEASE_TAG_SSH_KEY` Actions secret. The key is written to a temporary file only during the tag push, GitHub's SSH host keys are obtained through its HTTPS API, and the temporary files are removed afterward. The push uses `--force-with-lease` to reject a concurrent tag change. The deploy key has repository write access; the publishing script uses it only for the selected release tag. Rotate it by replacing the deploy key and matching Actions secret together. See [GitHub's deploy-key documentation](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys).
@@ -69,7 +69,7 @@ An optional `RELEASE_TOKEN` secret with **Contents: write** and **Workflows: wri
 If publication fails after all three native builds passed, retry publication using those artifacts instead of rebuilding:
 
 ```sh
-gh workflow run release.yml --ref main -f tag=v0.1.1 -f replace_published=true -f artifact_run_id=COMPLETED_RUN_ID
+gh workflow run release.yml --ref main -f tag=v1.0.0 -f replace_published=true -f artifact_run_id=COMPLETED_RUN_ID
 ```
 
 Recovery accepts only completed runs of this repository's release workflow, with successful validation and all supported native build jobs and a complete, unexpired artifact set. It uses that run's source SHA, verifies every manifest against it and rechecks asset checksums. The selected workflow revision must have the same version and supported target matrix as the recovered release. An already correct tag is left untouched. Recovery requires artifacts from an existing run; deleted runs cannot be reused. The recovery has its own workflow run.

@@ -17,7 +17,7 @@ Costs are estimated USD API-equivalent token values, not subscription bills or p
 
 ## Install
 
-Installers will be published on [Releases](https://github.com/huseyint/agent-usage/releases) after final validation:
+Download installers from [Releases](https://github.com/huseyint/agent-usage/releases):
 
 | Platform | Download |
 | --- | --- |
