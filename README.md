@@ -95,9 +95,6 @@ Reports show costs within the selected dates. Session details also include lifet
 
 ## Development
 
-The static project landing page lives in [`website/`](website/README.md), with
-preview and deployment instructions for `huseyint.com/agent-usage/`.
-
 Requires Node 26.13+ LTS (the exact development and CI version is in `.node-version`), pnpm, stable Rust and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```sh
