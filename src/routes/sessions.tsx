@@ -147,6 +147,7 @@ export function Sessions() {
     ([a], [b]) => a.localeCompare(b) * (groupsDescending ? -1 : 1),
   );
   const advancedFilterCount =
+    Number(u.filters.favorite) +
     Number(!!u.filters.provenance) +
     Number(!!u.filters.tag) +
     Number(u.filters.minCost !== null) +
@@ -157,7 +158,6 @@ export function Sessions() {
     advancedFilterCount +
     u.filters.projects.length +
     u.filters.models.length +
-    Number(u.filters.favorite) +
     Number(!!u.filters.sourceId);
   const visible = (column: string) => !hidden.includes(column) && fits(column);
   const columns =
@@ -314,21 +314,6 @@ export function Sessions() {
               ))}
             </select>
           </label>
-          <div className="filter-field">
-            <button
-              type="button"
-              className="filter-favorite-toggle"
-              title="Show sessions you've starred in session details"
-              aria-pressed={u.filters.favorite}
-              onClick={() => u.updateFilters({ favorite: !u.filters.favorite })}
-            >
-              <UIcon name="star" size={15} />
-              Favorites only
-              <span className="filter-toggle-track" aria-hidden="true">
-                <span />
-              </span>
-            </button>
-          </div>
           <button
             className={`secondary-button ${advanced ? "active" : ""}`}
             onClick={() => update({ sessionFiltersOpen: !advanced })}
@@ -444,6 +429,23 @@ export function Sessions() {
                   onChange={(e) => u.updateFilters({ tag: e.target.value })}
                 />
               </label>
+              <div className="filter-field">
+                <button
+                  type="button"
+                  className="filter-favorite-toggle"
+                  title="Show sessions you've starred in session details"
+                  aria-pressed={u.filters.favorite}
+                  onClick={() =>
+                    u.updateFilters({ favorite: !u.filters.favorite })
+                  }
+                >
+                  <UIcon name="star" size={15} />
+                  Favorites only
+                  <span className="filter-toggle-track" aria-hidden="true">
+                    <span />
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         )}

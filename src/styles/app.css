@@ -3055,7 +3055,7 @@ small {
   gap: 16px;
 }
 .session-primary-filters {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(155px, 0.8fr) auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
