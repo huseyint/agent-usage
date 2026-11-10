@@ -3377,8 +3377,17 @@ small {
 .session-cost {
   position: relative;
   display: block;
-  padding-right: 20px;
+  padding-right: calc(20px + var(--session-total-space, 0px));
   text-align: right;
+}
+.session-cost-total {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-weight: 400;
+  white-space: nowrap;
 }
 .session-cost-info {
   position: absolute;

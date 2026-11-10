@@ -1,5 +1,12 @@
 import { SessionActivityBadge } from "@/components/session-activity-badge";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useUsage } from "@/lib/usage-context";
 import { usageApi, errorMessage } from "@/lib/usage-api";
 import {
@@ -23,6 +30,7 @@ import { SessionCostInfo } from "@/components/session-cost-info";
 import { PeriodCost } from "@/components/period-cost";
 import {
   periodCostDescription,
+  groupCostDescription,
   lifetimeCostDescription,
   sessionPeriodCost,
   sessionModelPeriodCost,
@@ -31,28 +39,13 @@ import { PopupMenu } from "@/components/popup-menu";
 import { FilterMultiSelect } from "@/components/filter-multi-select";
 import { ProjectLabel } from "@/components/project-icon";
 import { sessionActivityDays, sessionFirstUsageDate } from "@/lib/session-days";
+import { sessionGroupKey, sessionGroupPeriod } from "@/lib/session-group";
 import type { Annotation, Query, Session } from "@/lib/usage-types";
 import {
   sessionColumnSort,
   sessionGroupsDescending,
   type SessionSortColumn,
 } from "@/lib/session-sort";
-function groupKey(s: Session, group: string, tz: string, weekStart: string) {
-  const day = dateKey(new Date(s.lastActivity), tz);
-  if (group === "project") return s.projectPath;
-  if (group === "provider") return s.provider;
-  if (group === "none") return "All sessions";
-  if (group === "month") return day.slice(0, 7);
-  if (group === "week") {
-    const d = new Date(`${day}T12:00:00`);
-    d.setDate(
-      d.getDate() -
-        (weekStart === "sunday" ? d.getDay() : (d.getDay() + 6) % 7),
-    );
-    return dateKey(d);
-  }
-  return day;
-}
 function groupLabel(key: string, group: string, s: Session, timezone: string) {
   if (group === "project") return s.project;
   if (group === "provider") return key === "claude" ? "Claude Code" : "Codex";
@@ -67,6 +60,9 @@ export function Sessions() {
   const v = u.view.data;
   const [search, setSearch] = useState(u.filters.search);
   const group = u.filters.groupBy;
+  const costLabel = ["day", "week", "month"].includes(group)
+    ? `this ${group} within the selected dates`
+    : "selected period";
   const setGroup = (groupBy: string) => u.updateFilters({ groupBy });
   const [advanced, setAdvanced] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -83,6 +79,18 @@ export function Sessions() {
   }, [tableElement]);
   const compactTable = tableWidth < 1000;
   const narrowTable = tableWidth < 760;
+  const sessionTotals = new Map(
+    (v?.sessions ?? [])
+      .filter((session) => sessionActivityDays(session).length > 1)
+      .map((session) => [
+        session.key,
+        `(${money(session.costMicros)}${session.missingPricing ? " +" : ""})`,
+      ]),
+  );
+  const totalWidth = Math.max(
+    0,
+    ...[...sessionTotals.values()].map((total) => total.length),
+  );
   const fits = (column: string) =>
     column === "tokens"
       ? !compactTable
@@ -132,7 +140,7 @@ export function Sessions() {
   }, [search]);
   const groups = new Map<string, Session[]>();
   for (const s of v?.sessions || []) {
-    const key = groupKey(s, group, u.prefs.timezone, u.prefs.weekStart);
+    const key = sessionGroupKey(s, u.query, u.prefs.timezone);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(s);
   }
@@ -523,6 +531,13 @@ export function Sessions() {
             className="data-table sessions-table"
             data-compact={compactTable || undefined}
             data-narrow={narrowTable || undefined}
+            style={
+              {
+                "--session-total-space": totalWidth
+                  ? `${totalWidth * 0.5}rem`
+                  : "0px",
+              } as CSSProperties
+            }
           >
             <thead>
               <tr>
@@ -551,7 +566,7 @@ export function Sessions() {
                   "periodCost",
                   "Estimated cost",
                   true,
-                  <span title={periodCostDescription}>Cost</span>,
+                  <span title={groupCostDescription}>Cost</span>,
                 )}
                 <th className="session-columns-cell">
                   <PopupMenu
@@ -596,7 +611,7 @@ export function Sessions() {
                           : ""}
                       </small>
                     </th>
-                    <th className="numeric" title={periodCostDescription}>
+                    <th className="numeric" title={groupCostDescription}>
                       <span className="session-cost">
                         {v?.groupPeriodTotals[key] == null
                           ? "—"
@@ -606,150 +621,181 @@ export function Sessions() {
                     <th className="session-columns-cell" aria-hidden="true" />
                   </tr>
                 )}
-                {rows.map((s) => (
-                  <Fragment key={s.key}>
-                    <tr className={expanded === s.key ? "expanded-row" : ""}>
-                      <td className="expand-cell">
-                        <button
-                          className="row-expand"
-                          aria-label={`${expanded === s.key ? "Collapse" : "Expand"} ${s.title}`}
-                          aria-expanded={expanded === s.key}
-                          onClick={() =>
-                            setExpanded(expanded === s.key ? null : s.key)
+                {rows.map((s) => {
+                  const [since, until] = sessionGroupPeriod(
+                    s,
+                    u.query,
+                    u.prefs.timezone,
+                  );
+                  const cost = sessionPeriodCost(s, since, until);
+                  return (
+                    <Fragment key={s.key}>
+                      <tr className={expanded === s.key ? "expanded-row" : ""}>
+                        <td className="expand-cell">
+                          <button
+                            className="row-expand"
+                            aria-label={`${expanded === s.key ? "Collapse" : "Expand"} ${s.title}`}
+                            aria-expanded={expanded === s.key}
+                            onClick={() =>
+                              setExpanded(expanded === s.key ? null : s.key)
+                            }
+                          >
+                            <UIcon
+                              name="chevron"
+                              size={12}
+                              style={{
+                                transform:
+                                  expanded === s.key
+                                    ? "rotate(90deg)"
+                                    : undefined,
+                              }}
+                            />
+                          </button>
+                        </td>
+                        <td className="session-time" title={s.lastActivity}>
+                          {group === "day" ? (
+                            time(s.lastActivity, u.prefs.timezone)
+                          ) : (
+                            <>
+                              {displayDate(
+                                dateKey(
+                                  new Date(s.lastActivity),
+                                  u.prefs.timezone,
+                                ),
+                              )}
+                              <small>
+                                {time(s.lastActivity, u.prefs.timezone)}
+                              </small>
+                            </>
+                          )}
+                        </td>
+                        <td className="session-name-cell">
+                          <button
+                            className="session-name"
+                            onClick={() => u.setSelected(s)}
+                          >
+                            {s.favorite && <UIcon name="star" size={12} />}
+                            <strong>{s.title}</strong>
+                            <SessionActivityBadge
+                              state={u.sessionActivity(s.key)}
+                            />
+                            {u.isNewSession(s.key) && <NewSessionBadge />}
+                          </button>
+                        </td>
+                        <td
+                          className="session-provider"
+                          title={
+                            s.provider === "claude" ? "Claude Code" : "Codex"
+                          }
+                          aria-label={
+                            s.provider === "claude" ? "Claude Code" : "Codex"
                           }
                         >
-                          <UIcon
-                            name="chevron"
-                            size={12}
-                            style={{
-                              transform:
-                                expanded === s.key
-                                  ? "rotate(90deg)"
-                                  : undefined,
-                            }}
+                          <ProviderMark
+                            provider={s.provider}
+                            label={!compactTable}
                           />
-                        </button>
-                      </td>
-                      <td className="session-time" title={s.lastActivity}>
-                        {group === "day" ? (
-                          time(s.lastActivity, u.prefs.timezone)
-                        ) : (
-                          <>
-                            {displayDate(
-                              dateKey(
-                                new Date(s.lastActivity),
-                                u.prefs.timezone,
-                              ),
-                            )}
-                            <small>
-                              {time(s.lastActivity, u.prefs.timezone)}
-                            </small>
-                          </>
-                        )}
-                      </td>
-                      <td className="session-name-cell">
-                        <button
-                          className="session-name"
-                          onClick={() => u.setSelected(s)}
-                        >
-                          {s.favorite && <UIcon name="star" size={12} />}
-                          <strong>{s.title}</strong>
-                          <SessionActivityBadge
-                            state={u.sessionActivity(s.key)}
-                          />
-                          {u.isNewSession(s.key) && <NewSessionBadge />}
-                        </button>
-                      </td>
-                      <td
-                        className="session-provider"
-                        title={
-                          s.provider === "claude" ? "Claude Code" : "Codex"
-                        }
-                        aria-label={
-                          s.provider === "claude" ? "Claude Code" : "Codex"
-                        }
-                      >
-                        <ProviderMark
-                          provider={s.provider}
-                          label={!compactTable}
-                        />
-                      </td>
-                      {visible("project") && (
-                        <td className="session-project" title={s.projectPath}>
-                          {s.projectPath ? (
-                            <button
-                              type="button"
-                              className="project-folder-link"
-                              aria-label={`Open project folder: ${s.projectPath}`}
-                              onClick={() =>
-                                void usageApi
-                                  .open("project", s.key)
-                                  .catch((e) => u.setNotice(errorMessage(e)))
-                              }
-                            >
+                        </td>
+                        {visible("project") && (
+                          <td className="session-project" title={s.projectPath}>
+                            {s.projectPath ? (
+                              <button
+                                type="button"
+                                className="project-folder-link"
+                                aria-label={`Open project folder: ${s.projectPath}`}
+                                onClick={() =>
+                                  void usageApi
+                                    .open("project", s.key)
+                                    .catch((e) => u.setNotice(errorMessage(e)))
+                                }
+                              >
+                                <ProjectLabel path={s.projectPath}>
+                                  {s.project}
+                                </ProjectLabel>
+                              </button>
+                            ) : (
                               <ProjectLabel path={s.projectPath}>
                                 {s.project}
                               </ProjectLabel>
-                            </button>
-                          ) : (
-                            <ProjectLabel path={s.projectPath}>
-                              {s.project}
-                            </ProjectLabel>
-                          )}
+                            )}
+                          </td>
+                        )}
+                        {visible("models") && (
+                          <td className="session-model">
+                            {modelName(s.models[0]?.model || "Unknown")}
+                            {s.models.length > 1 && (
+                              <small>+{s.models.length - 1}</small>
+                            )}
+                          </td>
+                        )}
+                        {visible("tokens") && (
+                          <td className="numeric muted">
+                            {compact(s.tokens.total)}
+                          </td>
+                        )}
+                        <td className="numeric strong">
+                          <span className="session-cost">
+                            <PeriodCost
+                              value={cost}
+                              label={costLabel}
+                              partial={s.missingPricing}
+                            />
+                            {sessionTotals.has(s.key) && (
+                              <span
+                                className="session-cost-total"
+                                title={lifetimeCostDescription}
+                                aria-label={`${money(s.costMicros)} across all dates${s.missingPricing ? ", plus unpriced usage" : ""}`}
+                              >
+                                {sessionTotals.get(s.key)}
+                              </span>
+                            )}
+                            <SessionCostInfo
+                              session={s}
+                              value={cost}
+                              label={costLabel}
+                            />
+                          </span>
                         </td>
-                      )}
-                      {visible("models") && (
-                        <td className="session-model">
-                          {modelName(s.models[0]?.model || "Unknown")}
-                          {s.models.length > 1 && (
-                            <small>+{s.models.length - 1}</small>
-                          )}
-                        </td>
-                      )}
-                      {visible("tokens") && (
-                        <td className="numeric muted">
-                          {compact(s.tokens.total)}
-                        </td>
-                      )}
-                      <td className="numeric strong">
-                        <span className="session-cost">
-                          <PeriodCost
-                            value={s.periodCostMicros}
-                            partial={s.missingPricing}
-                          />
-                          <SessionCostInfo session={s} />
-                        </span>
-                      </td>
-                      <td className="session-columns-cell" aria-hidden="true" />
-                    </tr>
-                    {expanded === s.key && (
-                      <tr className="session-expansion">
-                        <td colSpan={columns}>
-                          <div>
-                            <span>MODEL BREAKDOWN</span>
-                            {s.models.map((m) => (
-                              <div key={m.model}>
-                                <strong>{modelName(m.model)}</strong>
-                                <span>
-                                  {compact(m.tokens.input)} input ·{" "}
-                                  {compact(m.tokens.output)} output ·{" "}
-                                  {compact(m.tokens.cacheRead)} cache read
-                                </span>
-                                <strong>
-                                  <PeriodCost
-                                    value={m.periodCostMicros}
-
-                                    partial={m.missingPricing}
-                                  />
-                                </strong>
-                              </div>
-                            ))}
-                          </div>
-                        </td>
+                        <td
+                          className="session-columns-cell"
+                          aria-hidden="true"
+                        />
                       </tr>
-                    )}
-                  </Fragment>
-                ))}
+                      {expanded === s.key && (
+                        <tr className="session-expansion">
+                          <td colSpan={columns}>
+                            <div>
+                              <span>MODEL BREAKDOWN</span>
+                              {s.models.map((m) => (
+                                <div key={m.model}>
+                                  <strong>{modelName(m.model)}</strong>
+                                  <span>
+                                    {compact(m.tokens.input)} input ·{" "}
+                                    {compact(m.tokens.output)} output ·{" "}
+                                    {compact(m.tokens.cacheRead)} cache read
+                                  </span>
+                                  <strong>
+                                    <PeriodCost
+                                      value={sessionModelPeriodCost(
+                                        s,
+                                        m.model,
+                                        since,
+                                        until,
+                                      )}
+                                      label={costLabel}
+
+                                      partial={m.missingPricing}
+                                    />
+                                  </strong>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             ))}
           </table>

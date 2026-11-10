@@ -2,6 +2,8 @@ import type { Session } from "./usage-types.ts";
 
 export const periodCostDescription =
   "Estimated API-equivalent cost of usage recorded within the selected dates. Copied session history is counted once. Not a subscription charge.";
+export const groupCostDescription =
+  "Estimated API-equivalent cost within this group's day, week, or month and the selected dates. Other groups use the full selected period. Copied session history is counted once. Not a subscription charge.";
 export const lifetimeCostDescription =
   "Estimated API-equivalent cost across all dates for this session, including usage outside the selected period. Not a subscription charge.";
 export const unavailablePeriodDescription =

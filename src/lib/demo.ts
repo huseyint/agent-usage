@@ -17,6 +17,7 @@ import { dateKey } from "./format";
 import { sessionGroupsDescending } from "./session-sort";
 import { sessionPeriodCost, sessionModelPeriodCost } from "./costs";
 import { sessionFirstUsageDate, sessionInPeriod } from "./session-days";
+import { sessionGroupKey, sessionGroupPeriod } from "./session-group";
 const zero = (): Tokens => ({
   input: 0,
   output: 0,
@@ -373,33 +374,20 @@ export function demoView(q: Query): ViewData {
       first: `${sessionFirstUsageDate(s, prefs().timezone) ?? ""} ${s.firstActivity}`,
       last: s.lastActivity,
     })[q.sort as "last"] ?? s.lastActivity;
-  const groupKey = (s: Session) => {
-    const d = dateKey(new Date(s.lastActivity), prefs().timezone);
-    if (q.groupBy === "none") return "All sessions";
-    if (q.groupBy === "provider") return s.provider;
-    if (q.groupBy === "project") return s.projectPath;
-    if (q.groupBy === "month") return d.slice(0, 7);
-    if (q.groupBy === "week") {
-      const day = new Date(`${d}T12:00:00`);
-      day.setDate(
-        day.getDate() -
-          (q.weekStart === "sunday" ? day.getDay() : (day.getDay() + 6) % 7),
-      );
-      return dateKey(day);
-    }
-    return d;
-  };
+  const groupKey = (s: Session) => sessionGroupKey(s, q, prefs().timezone);
   const groupPeriodTotals: Record<string, number | null> = {};
   const groupTotals: Record<string, [number, number]> = {};
   sessions.forEach((s) => {
     const k = groupKey(s);
+    const [since, until] = sessionGroupPeriod(s, q, prefs().timezone);
+    const groupCost = sessionPeriodCost(s, since, until);
     if (!groupTotals[k]) groupTotals[k] = [0, 0];
     groupTotals[k][0]++;
     groupTotals[k][1] += s.costMicros;
     groupPeriodTotals[k] =
-      groupPeriodTotals[k] === null || s.periodCostMicros == null
+      groupPeriodTotals[k] === null || groupCost == null
         ? null
-        : (groupPeriodTotals[k] ?? 0) + s.periodCostMicros;
+        : (groupPeriodTotals[k] ?? 0) + groupCost;
   });
   const descendingGroups = sessionGroupsDescending(q);
   sessions.sort((a, b) => {

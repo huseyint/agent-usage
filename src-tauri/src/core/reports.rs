@@ -122,6 +122,44 @@ pub fn group_key(s: &Session, q: &Query, tz: &str) -> String {
         _ => day,
     }
 }
+fn group_query(s: &Session, q: &Query, tz: &str) -> Query {
+    let key = group_key(s, q, tz);
+    let range = match q.group_by.as_str() {
+        "day" => NaiveDate::parse_from_str(&key, "%Y-%m-%d")
+            .ok()
+            .map(|day| (day, day)),
+        "week" => NaiveDate::parse_from_str(&key, "%Y-%m-%d")
+            .ok()
+            .map(|start| (start, start + Duration::days(6))),
+        "month" => NaiveDate::parse_from_str(&format!("{key}-01"), "%Y-%m-%d")
+            .ok()
+            .map(|start| {
+                let end = if start.month() == 12 {
+                    NaiveDate::from_ymd_opt(start.year() + 1, 1, 1)
+                } else {
+                    NaiveDate::from_ymd_opt(start.year(), start.month() + 1, 1)
+                }
+                .unwrap()
+                    - Duration::days(1);
+                (start, end)
+            }),
+        _ => None,
+    };
+    let mut query = q.clone();
+    if let Some((start, end)) = range {
+        query.since = Some(
+            q.since
+                .clone()
+                .map_or(start.to_string(), |since| since.max(start.to_string())),
+        );
+        query.until = Some(
+            q.until
+                .clone()
+                .map_or(end.to_string(), |until| until.min(end.to_string())),
+        );
+    }
+    query
+}
 pub fn build(
     mut snapshot: Snapshot,
     q: &Query,
@@ -306,7 +344,9 @@ pub fn build(
         let period = group_period_totals
             .entry(group_key(s, q, &snapshot.timezone))
             .or_insert(Some(0));
-        *period = period.zip(s.period_cost_micros).map(|(a, b)| a + b);
+        *period = period
+            .zip(period_cost(s, &group_query(s, q, &snapshot.timezone)))
+            .map(|(a, b)| a + b);
     }
     let descending_groups =
         if q.sort == "last" && matches!(q.group_by.as_str(), "day" | "week" | "month") {
@@ -394,6 +434,106 @@ pub fn csv_cell(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn calendar_group_totals_use_group_dates_before_pagination() {
+        let days: Vec<_> = ["2026-10-31", "2026-11-01", "2026-11-08", "2026-11-09"]
+            .into_iter()
+            .enumerate()
+            .map(|(i, date)| DailyUsage {
+                date: date.into(),
+                cost_micros: (i as i64 + 1) * 1_000_000,
+                ..Default::default()
+            })
+            .collect();
+        let snapshot = Snapshot {
+            timezone: "America/Chicago".into(),
+            sessions: vec![
+                Session {
+                    key: "spanning".into(),
+                    provider: "codex".into(),
+                    project_path: "project".into(),
+                    last_activity: "2026-11-09T18:00:00Z".into(),
+                    cost_micros: 10_000_000,
+                    daily_usage: Some(days),
+                    ..Default::default()
+                },
+                Session {
+                    key: "same-day".into(),
+                    provider: "codex".into(),
+                    project_path: "project".into(),
+                    last_activity: "2026-11-09T15:00:00Z".into(),
+                    cost_micros: 1_000_000,
+                    daily_usage: Some(vec![DailyUsage {
+                        date: "2026-11-09".into(),
+                        cost_micros: 1_000_000,
+                        ..Default::default()
+                    }]),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        for (group, week_start, key, expected) in [
+            ("day", "monday", "2026-11-09", 5_000_000),
+            ("week", "monday", "2026-11-09", 5_000_000),
+            ("week", "sunday", "2026-11-08", 8_000_000),
+            ("month", "monday", "2026-11", 10_000_000),
+            ("project", "monday", "project", 11_000_000),
+            ("provider", "monday", "codex", 11_000_000),
+            ("none", "monday", "All sessions", 11_000_000),
+        ] {
+            let q = Query {
+                since: Some("2026-10-31".into()),
+                until: Some("2026-11-09".into()),
+                group_by: group.into(),
+                week_start: week_start.into(),
+                limit: 1,
+                ..Default::default()
+            };
+            let view = build(
+                snapshot.clone(),
+                &q,
+                &Default::default(),
+                &Default::default(),
+                false,
+            )
+            .unwrap();
+            assert_eq!(
+                view.group_period_totals[key],
+                Some(expected),
+                "{group} / {week_start}"
+            );
+            assert_eq!(view.group_totals[key].0, 2);
+            assert_eq!(view.sessions.len(), 1);
+            assert_eq!(view.sessions[0].period_cost_micros, Some(10_000_000));
+            assert_eq!(view.projects[0].period_cost_micros, Some(11_000_000));
+        }
+        let mut clipped = group_query(
+            &snapshot.sessions[0],
+            &Query {
+                group_by: "month".into(),
+                since: Some("2026-11-08".into()),
+                until: Some("2026-11-09".into()),
+                ..Default::default()
+            },
+            &snapshot.timezone,
+        );
+        assert_eq!(
+            period_cost(&snapshot.sessions[0], &clipped),
+            Some(7_000_000)
+        );
+        clipped.group_by = "day".into();
+        clipped = group_query(
+            &Session {
+                last_activity: "2026-11-09T04:00:00Z".into(),
+                ..snapshot.sessions[0].clone()
+            },
+            &clipped,
+            &snapshot.timezone,
+        );
+        assert_eq!(clipped.since.as_deref(), Some("2026-11-08"));
+        assert_eq!(clipped.until.as_deref(), Some("2026-11-08"));
+    }
     #[test]
     fn incomplete_metadata_uses_daily_dates_for_filters_totals_and_first_sort() {
         let day = |date: &str, cost| DailyUsage {
