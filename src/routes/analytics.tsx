@@ -8,6 +8,7 @@ import { bucketDaily } from "@/lib/chart-data";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useUsage } from "@/lib/usage-context";
+import { useViewState } from "@/lib/view-state";
 import {
   compact,
   costDescription,
@@ -307,7 +308,7 @@ export function Overview() {
 export function Projects() {
   const u = useUsage();
   const navigate = useNavigate();
-  const [sort, setSort] = useState("periodCost");
+  const { projectSort: sort, update } = useViewState();
   const [aliasKey, setAliasKey] = useState<string | null>(null);
   const [alias, setAlias] = useState("");
   const v = u.view.data;
@@ -349,7 +350,7 @@ export function Projects() {
             <select
               aria-label="Project sort"
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
+              onChange={(e) => update({ projectSort: e.target.value })}
             >
               <option value="periodCost">Estimated cost</option>
               <option value="sessions">Session count</option>
@@ -457,7 +458,7 @@ export function Projects() {
 export function Models() {
   const u = useUsage();
   const v = u.view.data;
-  const [sort, setSort] = useState("cost");
+  const { modelSort: sort, update } = useViewState();
   const models = [...(v?.models || [])].sort((a, b) =>
     sort === "name"
       ? a.model.localeCompare(b.model)
@@ -573,7 +574,7 @@ export function Models() {
                 Sort by
                 <select
                   value={sort}
-                  onChange={(e) => setSort(e.target.value)}
+                  onChange={(e) => update({ modelSort: e.target.value })}
                   aria-label="Model sort"
                 >
                   <option value="cost">Estimated cost</option>

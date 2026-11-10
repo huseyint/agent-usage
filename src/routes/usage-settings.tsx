@@ -23,6 +23,7 @@ import { TimezoneSelect } from "@/components/timezone-select";
 import { invoke } from "@tauri-apps/api/core";
 import { validMonthlyAllowance } from "@/lib/monthly-allowance";
 import { preferenceError } from "@/lib/preference-mutation";
+import { useViewState } from "@/lib/view-state";
 const sections = [
   "General",
   "Sources",
@@ -74,8 +75,11 @@ function Toggle({
 }
 export function UsageSettings() {
   const u = useUsage();
-  const [section, setSection] = useState("General");
-  const [search, setSearch] = useState("");
+  const {
+    settingsSection: section,
+    settingsSearch: search,
+    update,
+  } = useViewState();
   const [edits, setEdits] = useState<Partial<Preferences>>({});
   const draft = { ...u.prefs, ...edits };
   const [engineResult, setEngineResult] = useState("");
@@ -154,7 +158,7 @@ export function UsageSettings() {
             <input
               placeholder="Find a section…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => update({ settingsSearch: e.target.value })}
               aria-label="Search settings"
             />
           </label>
@@ -162,7 +166,7 @@ export function UsageSettings() {
             {filtered.map((s) => (
               <button
                 key={s}
-                onClick={() => setSection(s)}
+                onClick={() => update({ settingsSection: s })}
                 className={current === s ? "active" : ""}
               >
                 {s}
@@ -225,7 +229,7 @@ export function UsageSettings() {
               </SettingRow>
               <SettingRow
                 title="Default date range"
-                description="Used when opening the workspace."
+                description="Used until a range is selected, or when filters are reset."
               >
                 <select
                   aria-label="Default date range"

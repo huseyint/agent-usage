@@ -31,22 +31,33 @@ import { sessionQueryOptions } from "./session-query";
 import { monthlyAllowanceOptions } from "./monthly-allowance";
 import { useCurrentDay } from "./use-current-day";
 import { preferenceMutationOptions } from "./preference-mutation";
+import { useViewState } from "./view-state";
 function useUsageState() {
   const client = useQueryClient();
   const location = useLocation();
-  const [range, setRange] = useState("30d");
-  const [provider, setProvider] = useState("all");
-  const [customSince, setCustomSince] = useState("");
-  const [customUntil, setCustomUntil] = useState("");
-  const [filters, setFilters] = useState<Query>(defaultQuery);
+  const {
+    range: savedRange,
+    provider,
+    customSince,
+    customUntil,
+    filters,
+    dayOverride,
+    update,
+  } = useViewState();
+  // Persist search input immediately, while retaining the existing query debounce.
+  const [search, setSearch] = useState(filters.search);
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(filters.search), 250);
+    return () => clearTimeout(timeout);
+  }, [filters.search]);
   const [selected, setSelected] = useState<Session | null>(null);
   const [notice, setNotice] = useState<ReactNode>("");
-  const [dayOverride, setDayOverride] = useState<string | null>(null);
   const bootstrap = useQuery({
     queryKey: ["bootstrap"],
     queryFn: usageApi.bootstrap,
   });
   const prefs = bootstrap.data?.preferences || defaultPreferences;
+  const range = savedRange ?? prefs.defaultRange;
   const today = useCurrentDay(prefs.timezone);
   const monthlyUsage = useQuery({
     ...monthlyAllowanceOptions(today, prefs.timezone, usageApi.view),
@@ -58,12 +69,8 @@ function useUsageState() {
   useEffect(() => {
     if (bootstrap.data) {
       usePreferences.getState().setTheme(bootstrap.data.preferences.theme);
-      setRange(bootstrap.data.preferences.defaultRange);
     }
-  }, [
-    bootstrap.data?.preferences.defaultRange,
-    bootstrap.data?.preferences.theme,
-  ]);
+  }, [bootstrap.data?.preferences.theme]);
   const [since, until] = rangeDates(
     range,
     prefs.timezone,
@@ -74,13 +81,22 @@ function useUsageState() {
   const query = useMemo<Query>(
     () => ({
       ...defaultQuery,
-      ...(isSessions ? filters : {}),
+      ...(isSessions ? { ...filters, search } : {}),
       providers: provider === "all" ? [] : [provider],
       since: dayOverride || since,
       until: dayOverride || until,
       weekStart: prefs.weekStart,
     }),
-    [isSessions, filters, provider, since, until, dayOverride, prefs.weekStart],
+    [
+      isSessions,
+      filters,
+      search,
+      provider,
+      since,
+      until,
+      dayOverride,
+      prefs.weekStart,
+    ],
   );
   const reportView = useQuery({
     queryKey: ["usage", query],
@@ -159,12 +175,16 @@ function useUsageState() {
     refresh.mutate();
   }, [bootstrap.data?.preferences.onboarded]);
   const updateFilters = (changes: Partial<Query>) =>
-    setFilters((f) => ({ ...f, ...changes, offset: changes.offset ?? 0 }));
+    update((state) => ({
+      filters: { ...state.filters, ...changes, offset: changes.offset ?? 0 },
+    }));
   function reset() {
-    setFilters(defaultQuery);
-    setProvider("all");
-    setDayOverride(null);
-    setRange(prefs.defaultRange);
+    update({
+      filters: defaultQuery,
+      provider: "all",
+      dayOverride: null,
+      range: prefs.defaultRange,
+    });
   }
   return {
     bootstrap,
@@ -179,17 +199,19 @@ function useUsageState() {
     filters,
     updateFilters,
     provider,
-    setProvider,
+    setProvider: (provider: string) => update({ provider }),
     range,
     setRange: (r: string) => {
-      setRange(r);
-      setDayOverride(null);
-      setFilters((f) => ({ ...f, offset: 0 }));
+      update((state) => ({
+        range: r,
+        dayOverride: null,
+        filters: { ...state.filters, offset: 0 },
+      }));
     },
     customSince,
-    setCustomSince,
+    setCustomSince: (customSince: string) => update({ customSince }),
     customUntil,
-    setCustomUntil,
+    setCustomUntil: (customUntil: string) => update({ customUntil }),
     selected,
     setSelected,
     notice,
@@ -198,7 +220,7 @@ function useUsageState() {
     savePreferences,
     invalidate,
     dayOverride,
-    setDayOverride,
+    setDayOverride: (dayOverride: string | null) => update({ dayOverride }),
     reset,
   };
 }

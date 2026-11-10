@@ -1,5 +1,6 @@
 import { bucketDaily, type Bucket } from "@/lib/chart-data";
 import { useState, type ReactNode } from "react";
+import { useViewState } from "@/lib/view-state";
 import { useNavigate } from "react-router";
 import { useUsage } from "@/lib/usage-context";
 import { usageApi, errorMessage } from "@/lib/usage-api";
@@ -274,8 +275,11 @@ export function ProviderSplit({ daily }: { daily: DailyUsage[] }) {
 export function UsageChart({ daily }: { daily: DailyUsage[] }) {
   const u = useUsage();
   const navigate = useNavigate();
-  const [metric, setMetric] = useState("cost");
-  const [aggregation, setAggregation] = useState("day");
+  const {
+    chartMetric: metric,
+    chartAggregation: aggregation,
+    update,
+  } = useViewState();
   const [hover, setHover] = useState<Bucket | null>(null);
   const buckets = bucketDaily(daily, u.query.since, u.query.until, aggregation);
   const value = (b: Bucket) =>
@@ -302,7 +306,7 @@ export function UsageChart({ daily }: { daily: DailyUsage[] }) {
               <button
                 key={m}
                 className={metric === m ? "selected" : ""}
-                onClick={() => setMetric(m)}
+                onClick={() => update({ chartMetric: m })}
               >
                 {m === "cost" ? "Cost" : "Tokens"}
               </button>
@@ -311,7 +315,7 @@ export function UsageChart({ daily }: { daily: DailyUsage[] }) {
           <select
             aria-label="Chart aggregation"
             value={aggregation}
-            onChange={(e) => setAggregation(e.target.value)}
+            onChange={(e) => update({ chartAggregation: e.target.value })}
           >
             <option value="day">Daily</option>
             <option value="week">Weekly</option>

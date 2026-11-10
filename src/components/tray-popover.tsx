@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { isDesktop } from "@/lib/desktop";
 import { applyTheme, usePreferences } from "@/lib/preferences";
 import { usageApi, errorMessage } from "@/lib/usage-api";
-import { type Provider } from "@/lib/usage-types";
+import { useTrayViewState } from "@/lib/view-state";
 import { compact, dateKey, displayDate, modelName, time } from "@/lib/format";
 import {
   dismissTray,
@@ -35,7 +35,7 @@ function relativeTime(value: string, now: number) {
 
 export function TrayPopover() {
   const client = useQueryClient();
-  const [provider, setProvider] = useState<"all" | Provider>("all");
+  const { provider, update } = useTrayViewState();
   const [now, setNow] = useState(Date.now());
   const [actionError, setActionError] = useState("");
   const bootstrap = useQuery({
@@ -261,7 +261,7 @@ export function TrayPopover() {
             <button
               key={p}
               aria-pressed={provider === p}
-              onClick={() => setProvider(p)}
+              onClick={() => update({ provider: p })}
             >
               {p === "all"
                 ? "All agents"

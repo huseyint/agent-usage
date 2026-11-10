@@ -21,6 +21,7 @@ import { listen } from "@tauri-apps/api/event";
 import { usageApi, errorMessage } from "./lib/usage-api";
 import type { DashboardTarget } from "./lib/tray";
 import { UIcon } from "./components/usage-icon";
+import { useViewState } from "./lib/view-state";
 const client = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 30_000, retry: false, refetchOnWindowFocus: false },
@@ -32,6 +33,9 @@ function Application() {
   const u = useUsage();
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const { theme, toggleSidebar } = usePreferences();
+  useEffect(() => {
+    useViewState.getState().update({ pathname: location.pathname });
+  }, [location.pathname]);
   useLayoutEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const update = () => {

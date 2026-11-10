@@ -20,6 +20,7 @@
     "engine:build": "node scripts/build-engine.mjs",
     "test": "pnpm test:frontend && cargo test --manifest-path src-tauri/Cargo.toml",
     "test:frontend": "node --test tests/*.test.mjs",
+    "test:browser": "node --test tests/browser/*.test.mjs",
     "format": "prettier --write src scripts tests/*.mjs",
     "licenses:generate": "node scripts/sbom.mjs",
     "github:configure": "node scripts/configure-github.mjs",

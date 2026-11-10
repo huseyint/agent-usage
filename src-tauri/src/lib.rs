@@ -4,6 +4,7 @@ mod ipc;
 mod outside_click;
 mod tray;
 mod tray_icon;
+mod window_state;
 #[cfg(target_os = "macos")]
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, Manager};
@@ -18,13 +19,11 @@ pub fn run() {
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_denylist(&["tray"])
-                .with_state_flags(
-                    tauri_plugin_window_state::StateFlags::SIZE
-                        | tauri_plugin_window_state::StateFlags::POSITION
-                        | tauri_plugin_window_state::StateFlags::MAXIMIZED,
-                )
+                .skip_initial_state("main")
+                .with_state_flags(window_state::FLAGS)
                 .build(),
-        );
+        )
+        .plugin(window_state::init());
     #[cfg(target_os = "macos")]
     let builder = builder.menu(|app| {
         let menu = Menu::default(app)?;
@@ -150,6 +149,12 @@ pub fn run() {
             // register AppState before loading either frontend.
             for config in &app.config().app.windows {
                 let window = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
+                // Restore and validate placement before exposing the dashboard.
+                let window = if config.label == "main" {
+                    window.visible(false)
+                } else {
+                    window
+                };
                 #[cfg(any(target_os = "windows", target_os = "linux"))]
                 let window = if config.label == "main" {
                     window.decorations(false).shadow(true)

@@ -41,6 +41,7 @@ import { ProjectLabel } from "@/components/project-icon";
 import { sessionActivityDays, sessionFirstUsageDate } from "@/lib/session-days";
 import { sessionGroupKey, sessionGroupPeriod } from "@/lib/session-group";
 import type { Annotation, Query, Session } from "@/lib/usage-types";
+import { useViewState } from "@/lib/view-state";
 import {
   sessionColumnSort,
   sessionGroupsDescending,
@@ -58,15 +59,19 @@ function groupLabel(key: string, group: string, s: Session, timezone: string) {
 export function Sessions() {
   const u = useUsage();
   const v = u.view.data;
-  const [search, setSearch] = useState(u.filters.search);
+  const search = u.filters.search;
+  const setSearch = (search: string) => u.updateFilters({ search });
   const group = u.filters.groupBy;
   const costLabel = ["day", "week", "month"].includes(group)
     ? `this ${group} within the selected dates`
     : "selected period";
   const setGroup = (groupBy: string) => u.updateFilters({ groupBy });
-  const [advanced, setAdvanced] = useState(false);
+  const {
+    sessionFiltersOpen: advanced,
+    hiddenSessionColumns: hidden,
+    update,
+  } = useViewState();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [hidden, setHidden] = useState<string[]>([]);
   const [tableElement, setTableElement] = useState<HTMLDivElement | null>(null);
   const [tableWidth, setTableWidth] = useState(Infinity);
   useEffect(() => {
@@ -132,12 +137,6 @@ export function Sessions() {
     return () => observer.disconnect();
   }, [loadMoreTarget, hasNextPage, isFetching, isError, fetchNextPage]);
   const groupsDescending = sessionGroupsDescending(u.filters);
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (search !== u.filters.search) u.updateFilters({ search });
-    }, 250);
-    return () => clearTimeout(timeout);
-  }, [search]);
   const groups = new Map<string, Session[]>();
   for (const s of v?.sessions || []) {
     const key = sessionGroupKey(s, u.query, u.prefs.timezone);
@@ -232,7 +231,6 @@ export function Sessions() {
       maxTokens: null,
       offset: 0,
     });
-    setSearch("");
   }
   return (
     <div className="page sessions-page">
@@ -333,7 +331,7 @@ export function Sessions() {
           </div>
           <button
             className={`secondary-button ${advanced ? "active" : ""}`}
-            onClick={() => setAdvanced(!advanced)}
+            onClick={() => update({ sessionFiltersOpen: !advanced })}
             aria-expanded={advanced}
             aria-controls="session-filters"
           >
@@ -452,12 +450,7 @@ export function Sessions() {
         {(filterCount > 0 || u.filters.search) && (
           <div className="filter-chips">
             {u.filters.search && (
-              <button
-                onClick={() => {
-                  setSearch("");
-                  u.updateFilters({ search: "" });
-                }}
-              >
+              <button onClick={() => setSearch("")}>
                 Search: {u.filters.search}
                 <UIcon name="close" size={11} />
               </button>
@@ -582,11 +575,14 @@ export function Sessions() {
                       checked: visible(column),
                       disabled: !fits(column),
                       onSelect: () =>
-                        setHidden((hidden) =>
-                          hidden.includes(column)
-                            ? hidden.filter((value) => value !== column)
-                            : [...hidden, column],
-                        ),
+                        update((state) => ({
+                          hiddenSessionColumns:
+                            state.hiddenSessionColumns.includes(column)
+                              ? state.hiddenSessionColumns.filter(
+                                  (value) => value !== column,
+                                )
+                              : [...state.hiddenSessionColumns, column],
+                        })),
                     }))}
                   />
                 </th>
